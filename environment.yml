@@ -1,4 +1,4 @@
-name: causal2
+name: causal
 channels:
   - defaults
   - conda-forge

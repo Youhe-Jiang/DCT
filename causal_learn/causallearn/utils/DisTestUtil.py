@@ -81,7 +81,6 @@ class Estimation():
         h_hat_j1 = self._calc_h_hat(j1)
         h_hat_j2 = self._calc_h_hat(j2)
         mat = np.array([[1, sigma], [sigma, 1]], dtype=np.double, ndmin=2)
-        # pi_hat = 1- stats.multivariate_normal.cdf(x=[h_hat_j1, h_hat_j2], cov=mat, allow_singular=True)
         mean = [0, 0]  # Means for x and y
         # Upper limits are infinity (representing the tail of the distribution)
         upper_limit = np.array([np.inf, np.inf])
@@ -139,7 +138,6 @@ class Estimation():
         # Parallel to find out the sigma_hat_matrix and return as a matrix
         sigma_hat_mat = Parallel(n_jobs=-1)(delayed(self._calc_sigma_hat)(j1,j2) for j1 in range(p) for j2 in range(p))
         sigma_hat_mat = np.array(sigma_hat_mat).reshape(p,p)
-        # np.fill_diagonal(sigma_hat_mat, 1)
         
         return sigma_hat_mat
 
@@ -296,10 +294,6 @@ class Psi_grad():
         ]).astype(np.float64)
 
         
-# this should only be only only for i, in practice we need to calculate for all i and sum together
-# def psi_theta_vector(psi_vector, psi_grad):
-
-#     return np.linalg.inv(psi_grad) @ psi_vector
 
 
 # j1 is the index of the continous variable j2 is the index of binary variable
@@ -516,9 +510,6 @@ class disTest():
     def _save_all_grad(self):
         p = self.p 
         number_grad = int(p*p)
-        # grad_all = np.zeros([number_grad, 3, 3])
-        # grad_all_inv = np.zeros([number_grad, 3, 3])
-        # index = 0 
         grad_all = []
         grad_all_inv = []
         index = 0 
@@ -570,13 +561,10 @@ class disTest():
     def _calc_xai_all_minusj_minusj_i(self, i, j):
         X_tmp = self.X.copy()
         # X_tmp = np.delete(X_tmp, j, axis=1)
-        # xai_all = Parallel(n_jobs=-1)(delayed(self._calc_xai_i)(X_tmp, i, j1, j2) for j1 in range(self.p-1) for j2 in range(self.p-1))
         xai_all = Parallel(n_jobs=-1)(delayed(self._calc_xai_i)(X_tmp, i, j1, j2) for j1 in range(self.p) for j2 in range(self.p))
         xai_all_minusj = np.array(xai_all).reshape(self.p, self.p)
         xai_all_minusj = np.delete(np.delete(xai_all_minusj, j, axis=1), j, axis=0)
-        # xai_all = np.array(xai_all).reshape(self.p-1, self.p-1)
 
-        # return xai_all
         return xai_all_minusj
 
     
@@ -647,11 +635,6 @@ class disTest():
             results = pool.map(self.parallel_process, [(i, j) for i in range(self.n)])
             for result in results:
                 Xai_mat_summation += result
-        # for i in range(self.n):
-        #     Xai_minus_j_minus_j_i = self._calc_xai_all_minusj_minusj_i(i, j)
-        #     Xai_minus_j_j_i = self._calc_xai_all_minusj_j_i(i, j)
-        #     Xai_vector = self._rearrange_xai(Xai_minus_j_minus_j_i, Xai_minus_j_j_i)
-        #     Xai_mat_summation += Xai_vector @ Xai_vector.T
         Xai_mat_avg = Xai_mat_summation/self.n    
         # print(Xai_mat_avg)
         variance = weighting_vector.T @ Xai_mat_avg @ weighting_vector
@@ -662,8 +645,7 @@ class disTest():
     def _inference(self, j, k):
         X = self.X.copy()
         theta = self._calc_sigma_mat_minus_j_inv(j)
-        beta_j = theta @ self._calc_sigma_vector_minusj_j(j)
-        # beta_j_true = self._true_beta_from_cov(self.cov, j)        
+        beta_j = theta @ self._calc_sigma_vector_minusj_j(j)       
         
         var_jk = self._get_variance_jk(theta, beta_j, j , k)
         if k > j:
@@ -682,16 +664,6 @@ class disTest():
         return p_value
     
 
-    # def _independence_inference(self, j1, j2):
-    #     X = self.X.copy()
-    #     n = self.n 
-    #     var_j1_j2 = self.get_varaince(X, j1, j2)
-    #     sigma_hat = self.estimation._calc_sigma_hat(j1, j2)
-    #     z_score = (sigma_hat*np.sqrt(n) - 0)/np.sqrt(var_j1_j2)
-    #     p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))
-
-    #     print("P-value", p_value)
-    #     return p_value
     def _independence_inference(self, j1, j2):
 
         X = self.X
@@ -740,21 +712,16 @@ class disTest():
             psi_grad = Psi_grad_mixed(X, j2, j1)
             psi_grad_matrix = psi_grad.Psi_grad_matrix()
             psi_grad_matrix_inv = np.linalg.inv(psi_grad_matrix)
-            # logging.debug(psi_grad_matrix_inv)
             variance_vector = np.linalg.inv(psi_grad_matrix) @ psi_matrix_average @ np.linalg.inv(psi_grad_matrix.T)
         
         else:
             variance_vector = Psi_con(X, j1, j2).Var()
             variance_vector = variance_vector.reshape(1,1)
             
-        # print("The estimated covaraince is ", sigma_hat)
         sigma_hat = estimator._calc_sigma_hat(j1, j2)
         z_score = (sigma_hat*np.sqrt(n) - 0)/np.sqrt(variance_vector[0,0])
         p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))
         
-        # Calculate the p-value for a two-tailed test
-        # print("Variance:", variance_vector[0,0], variance_vector[1,1], variance_vector[2,2])
-        # print("Z-score:", z_score)
         print("Variance:", variance_vector[0,0])
         print("P-value:", p_value)
 
